@@ -5,7 +5,6 @@ FROM docker.io/golang:${GOLANG_VERSION} as build
 WORKDIR /test
 
 COPY go.mod go.mod
-COPY go.sum go.sum
 
 RUN go mod download
 
