@@ -8,7 +8,7 @@ PROJECT=...
 REGION=...
 REPO=...
 GXR="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}"
-TAG=(git rev-parse HEAD)
+TAG="$(git rev-parse HEAD)"
 
 gcloud projects create ${PROJECT}
 gcloud beta billing projects link ${PROJECT} \
@@ -21,12 +21,6 @@ gcloud artifacts repositories create ${REPOSITORY} \
 --location=${REGION} \
 --repository-format=docker \
 --project=${PROJECT}
-
-gcloud auth print-access-token \
-| docker login \
-  --username=oauth2accesstoken \
-  --password-stdin \
-  ${REGION}-docker.pkg.dev
 ```
 
 ## Docker
