@@ -1,5 +1,10 @@
 # Issues deploying Podman built images to Cloud Run
 
++ https://github.com/containers/podman/issues/12026
++ https://issuetracker.google.com/issues/204067898
+
+Solution: Use `podman build --format=docker` to create Docker Registry (rather than OCI) format manifests.
+
 ## GCP preamble
 
 ```bash
@@ -8,6 +13,7 @@ PROJECT=...
 REGION=...
 REPO=...
 GXR="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}"
+NAME="test"
 TAG="$(git rev-parse HEAD)"
 
 gcloud projects create ${PROJECT}
@@ -33,21 +39,12 @@ gcloud auth print-access-token \
   ${REGION}-docker.pkg.dev
 
 docker build \
---tag=${GXR}/test:${TAG} \
+--tag=${GXR}/${NAME}:${TAG} \
 --file=./Dockerfile \
 .
 
-docker push ${GXR}/test:${TAG}}
- 
-gcloud run deploy test \
---max-instances=1 \
---platform=managed \
---ingress=all \
---allow-unauthenticated \
---image=${GXR}/test:${TAG} \
---project=${PROJECT} \
---region=${REGION}
-``` 
+docker push ${GXR}/${NAME}:${TAG}}
+ ``` 
 
 Manifest:
 
@@ -85,38 +82,11 @@ gcloud auth print-access-token \
   ${REGION}-docker.pkg.dev
 
 podman build \
---tag=${GXR}/test:${TAG} \
+--tag=${GXR}/${NAME}:${TAG} \
 --file=./Dockerfile \
 .
 
-podman push ${GXR}/test:${TAG}
- 
-gcloud run deploy test \
---max-instances=1 \
---platform=managed \
---ingress=all \
---allow-unauthenticated \
---image=${GXR}/test:${TAG} \
---project=${PROJECT} \
---region=${REGION}
-```
-
-Fails:
-
-```console
-ERROR: (gcloud.run.deploy) Image '${GXR}/test:${TAG}' not found.
-```
-
-But:
-
-```bash
-gcloud artifacts docker tags list ${GXR}/test \
---format="value(tag)"
-```
-Yields:
-
-```
-be0d7950c65509e8eec7d95ee29c02f8c5ce0343
+podman push ${GXR}/${NAME}:${TAG}
 ```
 
 Manifest:
@@ -146,4 +116,48 @@ Manifest:
       "org.opencontainers.image.base.name": ""
    }
 }
+```
+
+## Cloud Run
+
+```bash
+gcloud run deploy ${NAME} \
+--image=${GXR}/${NAME}:${TAG} \
+--max-instances=1 \
+--platform=managed \
+--ingress=all \
+--allow-unauthenticated \
+--region=${REGION} \
+--project=${PROJECT}
+
+ENDPOINT=$(\
+  gcloud run services describe ${NAME} \
+  --platform=managed \
+  --region=${REGION} \
+  --project=${PROJECT} \
+  --format="value(status.address.url)") && \
+echo ${ENDPOINT}
+
+curl \
+--header "Authorization: Bearer $(gcloud auth print-identity-token)" \
+${ENDPOINT}
+Hello Freddie
+```
+
+Fails with `podman build` without `--format=docker` because, by default, podman creates OCI-format manifests and, while GAR supports OCI images, Cloud Run appears to not support them:
+
+```console
+ERROR: (gcloud.run.deploy) Image '${GXR}/test:${TAG}' not found.
+```
+
+But:
+
+```bash
+gcloud artifacts docker tags list ${GXR}/test \
+--format="value(tag)"
+```
+Yields:
+
+```
+be0d7950c65509e8eec7d95ee29c02f8c5ce0343
 ```
