@@ -85,7 +85,7 @@ gcloud auth print-access-token \
   ${REGION}-docker.pkg.dev
 
 podman build \
---tag=${GXR}/test:${TAG}} \
+--tag=${GXR}/test:${TAG} \
 --file=./Dockerfile \
 .
 
